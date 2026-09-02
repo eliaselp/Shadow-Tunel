@@ -103,12 +103,12 @@ APT_INSTALL="apt-get"
 
 paquete_local() {  # $1=paquete, $2=binario
   local pkg="$1" bin="$2"
-  if ! command -v "$bin" >/dev/null 2>&1; then
+  if ! command -v "$bin"; then
     info "Falta '$bin'; instalando $pkg automaticamente..."
     $APT_INSTALL update
     $APT_INSTALL install -y "$pkg"
   fi
-  command -v "$bin" >/dev/null 2>&1 || fail "No se pudo instalar $pkg. Instalalo manualmente o revisa los repositorios."
+  command -v "$bin" || fail "No se pudo instalar $pkg. Instalalo manualmente o revisa los repositorios."
   ok "$pkg disponible ($bin)"
 }
 
@@ -118,7 +118,7 @@ paquete_local qrencode qrencode
 # Localizar sshpass (puede estar en ~/.local/bin del usuario aunque el
 # script se ejecute con sudo, donde el PATH es el de root).
 SSHPASS_BIN=""
-for c in "$(command -v sshpass 2>/dev/null || true)" \
+for c in "$(command -v sshpass || true)" \
          "$HOME/.local/bin/sshpass" \
          "/usr/local/bin/sshpass" \
          "/usr/bin/sshpass" \
@@ -129,7 +129,7 @@ if [ -n "$SSH_PASS" ] && [ -z "$SSHPASS_BIN" ]; then
   info "Falta 'sshpass'; instalando automaticamente..."
   $APT_INSTALL update
   $APT_INSTALL install -y sshpass
-  for c in "$(command -v sshpass 2>/dev/null || true)" \
+  for c in "$(command -v sshpass || true)" \
            "$HOME/.local/bin/sshpass" \
            "/usr/local/bin/sshpass" \
            "/usr/bin/sshpass" \
@@ -157,7 +157,7 @@ ok "Conexion SSH establecida (uid=$REMOTE_UID)."
 
 # ---------- claves de dispositivos ----------
 REUSE="no"
-if ls "$CLIENTES_DIR"/*.conf >/dev/null 2>&1; then
+if ls "$CLIENTES_DIR"/*.conf; then
   read -rp "Existen configs en clientes/. ¿Reutilizar sus claves? (s=no romper dispositivos actuales) [s/N]: " ans
   [[ "$ans" =~ ^[sSyY]$ ]] && REUSE="yes"
 fi
@@ -228,18 +228,18 @@ echo "==== [3/6] Configurando firewall (NO INVASIVO) ===="
 # NO se enciende ufw ni se cambia su politica. Si ufw ya estaba activo se
 # anaden SOLO las reglas minimas de la VPN. Si no, las reglas se aplican
 # via iptables scoped a wg0 (PostUp) sin afectar a otros servicios.
-if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -q "Status: active"; then
+if command -v ufw && ufw status | grep -q "Status: active"; then
   echo "ufw ya activo: anadiendo reglas minimas (51820/udp, wg0) sin tocar la politica."
-  ufw allow 51820/udp >/dev/null 2>&1 || true
-  ufw allow in on wg0 >/dev/null 2>&1 || true
-  ufw reload >/dev/null 2>&1 || true
+  ufw allow 51820/udp || true
+  ufw allow in on wg0 || true
+  ufw reload || true
 else
   echo "ufw inactivo/ausente: NO se toca la politica de firewall global."
   echo "Las reglas de la VPN se aplican via iptables en PostUp de wg0."
 fi
 
 echo "==== [4/6] Escribiendo /etc/wireguard/wg0.conf ===="
-DEF_IF=$(ip route 2>/dev/null | awk '/^default/{print $5; exit}')
+DEF_IF=$(ip route | awk '/^default/{print $5; exit}')
 DEF_IF=${DEF_IF:-eth0}
 echo "Interfaz de salida detectada: $DEF_IF"
 
@@ -278,7 +278,7 @@ WGEOF
 echo "[ OK ] wg0.conf escrito"
 
 echo "==== [5/6] Arrancando WireGuard (primero, para que exista 10.66.66.1) ===="
-systemctl enable wg-quick@wg0 >/dev/null 2>&1 || true
+systemctl enable wg-quick@wg0 || true
 systemctl restart wg-quick@wg0
 sleep 3
 wg show wg0 || true
@@ -287,7 +287,7 @@ echo "==== [6/6] DNS del tunel ===="
 install_dnsmasq() {
   echo "Instalando dnsmasq (DNS simple del tunel)..."
   apt-get install -y dnsmasq || { echo "[AVISO] fallo al instalar dnsmasq"; return 0; }
-  systemctl stop dnsmasq >/dev/null 2>&1 || true  # silenciar autostart fallido del paquete
+  systemctl stop dnsmasq || true  # silenciar autostart fallido del paquete
   cat > /etc/dnsmasq.d/wireguard.conf <<DMS
 interface=wg0
 listen-address=10.66.66.1
@@ -296,14 +296,14 @@ no-resolv
 server=1.1.1.1
 server=8.8.8.8
 DMS
-  systemctl enable dnsmasq >/dev/null 2>&1 || true
+  systemctl enable dnsmasq || true
   systemctl restart dnsmasq || true
 }
 if [ "__INSTALL_ADGUARD__" = "yes" ]; then
   echo "Instalando AdGuard Home (DNS + bloqueo de anuncios)..."
   AG_OK=0
-  AG_VER=$(curl -s --max-time 20 https://api.github.com/repos/AdguardTeam/AdGuardHome/releases/latest \
-    | python3 -c "import json,sys;print(json.load(sys.stdin).get('tag_name','v0.107.0'))" 2>/dev/null || echo v0.107.0)
+  AG_VER=$(curl --max-time 20 https://api.github.com/repos/AdguardTeam/AdGuardHome/releases/latest \
+    | python3 -c "import json,sys;print(json.load(sys.stdin).get('tag_name','v0.107.0'))" || echo v0.107.0)
   AG_URL="https://github.com/AdguardTeam/AdGuardHome/releases/download/${AG_VER}/AdGuardHome_linux_amd64.tar.gz"
   echo "Descargando AdGuardHome ${AG_VER} (con progreso, reanudable)..."
   cd /tmp
@@ -312,7 +312,7 @@ if [ "__INSTALL_ADGUARD__" = "yes" ]; then
     if tar -xzf ag.tar.gz -C /opt; then
       chmod +x /opt/AdGuardHome/AdGuardHome
       ADM_PASS="Adm$(openssl rand -hex 6)"
-      HASH=$(/opt/AdGuardHome/AdGuardHome --hash-password "$ADM_PASS" 2>/dev/null | tr -d '\r' | tail -n1)
+      HASH=$(/opt/AdGuardHome/AdGuardHome --hash-password "$ADM_PASS" | tr -d '\r' | tail -n1)
       if [ -n "$HASH" ]; then
         cat > /opt/AdGuardHome/AdGuardHome.yaml <<AGEOF
 schema_version: 34
@@ -371,17 +371,17 @@ RestartSec=5
 WantedBy=multi-user.target
 SVC
         systemctl daemon-reload
-        systemctl enable AdGuardHome >/dev/null 2>&1 || true
+        systemctl enable AdGuardHome || true
         systemctl restart AdGuardHome || true
         sleep 4
-        if ss -lunp 2>/dev/null | grep -q '10.66.66.1:53'; then
+        if ss -lunp | grep -q '10.66.66.1:53'; then
           AG_OK=1
           echo "ADGUARD_PASS=${ADM_PASS}"
           echo "${ADM_PASS}" > /etc/wireguard/.adguard_admin_pw
           chmod 600 /etc/wireguard/.adguard_admin_pw
         else
           echo "AdGuard no escucha en 10.66.66.1:53. Log:"
-          journalctl -u AdGuardHome --no-pager -n 10 2>/dev/null | tail -10 || true
+          journalctl -u AdGuardHome --no-pager -n 10 | tail -10 || true
         fi
       fi
     fi
@@ -415,10 +415,10 @@ ssh_run $RUN_AS_SUDO bash -s < "$REMOTE" | tee "$OUTPUT"
 rm -f "$REMOTE"
 
 # ---------- capturar resultados ----------
-ADGUARD_OK=$(grep -oP 'ADGUARD_OK=\K[01]' "$OUTPUT" 2>/dev/null | tail -1 || echo 0)
-ADGUARD_PASS=$(grep -oP 'ADGUARD_PASS=\K.*' "$OUTPUT" 2>/dev/null | tail -1 || true)
+ADGUARD_OK=$(grep -oP 'ADGUARD_OK=\K[01]' "$OUTPUT" | tail -1 || echo 0)
+ADGUARD_PASS=$(grep -oP 'ADGUARD_PASS=\K.*' "$OUTPUT" | tail -1 || true)
 
-SRV_PUB_ACTUAL=$(ssh_run $RUN_AS_SUDO 'wg show wg0 public-key 2>/dev/null || true' | tr -d '\r')
+SRV_PUB_ACTUAL=$(ssh_run $RUN_AS_SUDO 'wg show wg0 public-key || true' | tr -d '\r')
 if [ -n "$SRV_PUB_ACTUAL" ]; then
   if [ -n "$SRV_PUB" ] && [ "$SRV_PUB" != "$SRV_PUB_ACTUAL" ]; then
     warn "La clave publica real del servidor difiere de la local; usando la real."
@@ -452,7 +452,7 @@ done
 
 # Si se ejecuto con sudo, devolver la propiedad de clientes/ al usuario real
 if [ -n "${SUDO_USER:-}" ]; then
-  chown -R "$SUDO_USER":"$SUDO_USER" "$CLIENTES_DIR" 2>/dev/null || true
+  chown -R "$SUDO_USER":"$SUDO_USER" "$CLIENTES_DIR" || true
   ok "Propiedad de clientes/ devuelta a $SUDO_USER"
 fi
 

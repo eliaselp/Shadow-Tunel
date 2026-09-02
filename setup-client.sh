@@ -22,7 +22,7 @@ CLIENTES_DIR="$PROYECTO/clientes"
 DISPOSITIVO="${1:-laptop}"
 CONF="$CLIENTES_DIR/$DISPOSITIVO.conf"
 # IP del servidor derivada del Endpoint de la config (para verificacion)
-VPS_IP="$(awk '/^Endpoint/{split($3,a,":"); print a[1]}' "$CONF" 2>/dev/null)"
+VPS_IP="$(awk '/^Endpoint/{split($3,a,":"); print a[1]}' "$CONF")"
 [ -n "$VPS_IP" ] || VPS_IP="TU_IP_DEL_VPS"
 
 info() { echo -e "\033[1;34m[INFO]\033[0m $*"; }
@@ -34,7 +34,7 @@ fail() { echo -e "\033[1;31m[ERROR]\033[0m $*"; exit 1; }
 limpiar_existente() {
   info "Limpiando configuracion previa de '$DISPOSITIVO' (si existe)..."
   # Interfaz grafica: conexion en NetworkManager
-  if nmcli connection show "$DISPOSITIVO" >/dev/null 2>&1; then
+  if nmcli connection show "$DISPOSITIVO"; then
     nmcli connection delete "$DISPOSITIVO"
     ok "Conexion NetworkManager '$DISPOSITIVO' eliminada"
   fi
@@ -43,8 +43,8 @@ limpiar_existente() {
   # Modo CLI
   rm -f "/etc/wireguard/${DISPOSITIVO}.conf"
   # Interfaz residual
-  if ip link show "$DISPOSITIVO" >/dev/null 2>&1; then
-    ip link del "$DISPOSITIVO" 2>/dev/null || true
+  if ip link show "$DISPOSITIVO"; then
+    ip link del "$DISPOSITIVO" || true
     ok "Interfaz '$DISPOSITIVO' residual eliminada"
   fi
   ok "Limpieza de '$DISPOSITIVO' completada"
@@ -119,14 +119,14 @@ instalar_amneziavpn() {
   fi
 
   local TAG URL ARCHIVO
-  TAG=$(curl -s --max-time 30 https://api.github.com/repos/amnezia-vpn/amnezia-client/releases/latest \
-        | python3 -c "import json,sys;print(json.load(sys.stdin)['tag_name'])" 2>/dev/null || true)
+  TAG=$(curl --max-time 30 https://api.github.com/repos/amnezia-vpn/amnezia-client/releases/latest \
+        | python3 -c "import json,sys;print(json.load(sys.stdin)['tag_name'])" || true)
   [ -n "$TAG" ] || { warn "No se pudo obtener la ultima version; usando 5.0.1.5"; TAG="5.0.1.5"; }
 
   URL="https://github.com/amnezia-vpn/amnezia-client/releases/download/${TAG}/AmneziaVPN_${TAG}_linux_x64.run"
-  if ! wget -q --spider "$URL" 2>/dev/null; then
+  if ! wget --spider "$URL"; then
     warn "URL directa no disponible para $TAG; descubriendo asset desde la API..."
-    URL=$(curl -s --max-time 30 "https://api.github.com/repos/amnezia-vpn/amnezia-client/releases/latest" \
+    URL=$(curl --max-time 30 "https://api.github.com/repos/amnezia-vpn/amnezia-client/releases/latest" \
           | python3 -c "
 import json,sys
 d=json.load(sys.stdin)
@@ -134,7 +134,7 @@ for a in d.get('assets',[]):
     n=a['name'].lower()
     if 'linux' in n and 'x64' in n and n.endswith('.run'):
         print(a['browser_download_url']); sys.exit()
-" 2>/dev/null || true)
+" || true)
   fi
   [ -n "$URL" ] || fail "No se encontro instalador Linux para AmneziaVPN. Descargalo manualmente desde https://github.com/amnezia-vpn/amnezia-client/releases"
 
@@ -181,13 +181,13 @@ verificar_conexion() {
   info "===== VERIFICACION DE CONEXION ====="
   sleep 3
   echo "--- Estado del tunel ($DISPOSITIVO) ---"
-  ip -4 addr show "$DISPOSITIVO" 2>/dev/null || true
+  ip -4 addr show "$DISPOSITIVO" || true
   echo ""
   echo "--- Handshake y transferencia ---"
-  wg show "$DISPOSITIVO" 2>/dev/null || true
+  wg show "$DISPOSITIVO" || true
   echo ""
   echo "--- DNS del tunel ---"
-  resolvectl status "$DISPOSITIVO" 2>/dev/null || true
+  resolvectl status "$DISPOSITIVO" || true
   echo ""
   echo "--- Ping 8.8.8.8 ---"
   ping -c 2 -W 2 8.8.8.8 2>&1 | tail -2 || true
@@ -196,7 +196,7 @@ verificar_conexion() {
   echo "--- DNS del tunel: dig @10.66.66.1 google.com ---"
   timeout 6 dig @10.66.66.1 google.com A +short 2>&1 || true
   echo "--- IP publica (debe ser $VPS_IP = Dallas) ---"
-  IP_PUB=$(timeout 10 curl -s https://api.ipify.org 2>/dev/null || echo "??")
+  IP_PUB=$(timeout 10 curl https://api.ipify.org || echo "??")
   echo "IP publica: $IP_PUB"
   echo ""
   if [ "$IP_PUB" = "$VPS_IP" ]; then

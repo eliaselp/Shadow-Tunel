@@ -36,7 +36,7 @@ uninstall_cliente() {
   echo "=========================================================="
 
   info "Eliminando conexiones NetworkManager tipo WireGuard (interfaz grafica)..."
-  mapfile -t WG_CONNS < <(nmcli -t -f NAME,TYPE connection show 2>/dev/null | awk -F: '$2=="wireguard"{print $1}')
+  mapfile -t WG_CONNS < <(nmcli -t -f NAME,TYPE connection show | awk -F: '$2=="wireguard"{print $1}')
   if [ "${#WG_CONNS[@]}" -gt 0 ]; then
     for conn in "${WG_CONNS[@]}"; do
       nmcli connection delete "$conn" && ok "Conexion eliminada: $conn"
@@ -48,7 +48,7 @@ uninstall_cliente() {
   info "Eliminando perfiles WireGuard residuales en system-connections..."
   for f in /etc/NetworkManager/system-connections/*.nmconnection; do
     [ -f "$f" ] || continue
-    if grep -q '^type=wireguard' "$f" 2>/dev/null; then
+    if grep -q '^type=wireguard' "$f"; then
       rm -f "$f" && ok "Perfil eliminado: $(basename "$f")"
     fi
   done
@@ -58,8 +58,8 @@ uninstall_cliente() {
 
   info "Eliminando interfaces residuales (laptop/wg0)..."
   for iface in laptop wg0; do
-    if ip link show "$iface" >/dev/null 2>&1; then
-      ip link del "$iface" 2>/dev/null && ok "Interfaz $iface eliminada" || true
+    if ip link show "$iface"; then
+      ip link del "$iface" && ok "Interfaz $iface eliminada" || true
     fi
   done
 
@@ -69,7 +69,7 @@ uninstall_cliente() {
   done
 
   info "Eliminando logs locales de diagnostico/reparacion..."
-  rm -f /home/*/Desktop/dev-agent/Proyectos/VPN-Personal/reparar-vpn.log 2>/dev/null || true
+  rm -f /home/*/Desktop/dev-agent/Proyectos/VPN-Personal/reparar-vpn.log || true
 
   ok "CLIENTE LIMPIO."
 }
@@ -100,15 +100,15 @@ uninstall_servidor() {
   fi
 
   SSHPASS_BIN=""
-  for c in "$(command -v sshpass 2>/dev/null || true)" "$HOME/.local/bin/sshpass" "/usr/local/bin/sshpass" "/usr/bin/sshpass" /home/*/.local/bin/sshpass; do
+  for c in "$(command -v sshpass || true)" "$HOME/.local/bin/sshpass" "/usr/local/bin/sshpass" "/usr/bin/sshpass" /home/*/.local/bin/sshpass; do
     [ -n "$c" ] && [ -x "$c" ] && SSHPASS_BIN="$c" && break
   done
   if [ -n "$SSH_PASS" ] && [ -z "$SSHPASS_BIN" ]; then
     APT_INSTALL="apt-get"; [ "$(id -u)" != "0" ] && APT_INSTALL="sudo apt-get"
     info "Instalando sshpass localmente..."
-    $APT_INSTALL update >/dev/null 2>&1 || true
-    $APT_INSTALL install -y sshpass >/dev/null 2>&1 || warn "No se pudo instalar sshpass; usa clave SSH."
-    for c in "$(command -v sshpass 2>/dev/null || true)" /home/*/.local/bin/sshpass; do
+    $APT_INSTALL update || true
+    $APT_INSTALL install -y sshpass || warn "No se pudo instalar sshpass; usa clave SSH."
+    for c in "$(command -v sshpass || true)" /home/*/.local/bin/sshpass; do
       [ -n "$c" ] && [ -x "$c" ] && SSHPASS_BIN="$c" && break
     done
     [ -n "$SSHPASS_BIN" ] || warn "sshpass no disponible; se usara SSH interactivo."
@@ -142,17 +142,17 @@ set -e
 export DEBIAN_FRONTEND=noninteractive
 
 echo "==== [1/7] Deteniendo servicios de la VPN ===="
-systemctl stop wg-quick@wg0 2>/dev/null || true
-systemctl disable wg-quick@wg0 2>/dev/null || true
-systemctl stop AdGuardHome 2>/dev/null || true
-systemctl disable AdGuardHome 2>/dev/null || true
-systemctl stop dnsmasq 2>/dev/null || true
-systemctl disable dnsmasq 2>/dev/null || true
+systemctl stop wg-quick@wg0 || true
+systemctl disable wg-quick@wg0 || true
+systemctl stop AdGuardHome || true
+systemctl disable AdGuardHome || true
+systemctl stop dnsmasq || true
+systemctl disable dnsmasq || true
 
 echo "==== [2/7] Eliminando reglas ufw de la VPN (se mantiene SSH) ===="
-ufw --force delete allow in on wg0 >/dev/null 2>&1 || true
-ufw --force delete allow 51820/udp >/dev/null 2>&1 || true
-ufw reload >/dev/null 2>&1 || true
+ufw --force delete allow in on wg0 || true
+ufw --force delete allow 51820/udp || true
+ufw reload || true
 
 echo "==== [3/7] Eliminando archivos de la VPN ===="
 rm -rf /etc/wireguard
@@ -162,20 +162,20 @@ rm -f /etc/dnsmasq.d/wireguard.conf
 rm -f /etc/sysctl.d/99-wireguard.conf
 rm -f /usr/local/bin/wg-add-peer.sh /usr/local/bin/wg-healthcheck.sh
 rm -f /etc/cron.d/wg-healthcheck
-systemctl daemon-reload 2>/dev/null || true
+systemctl daemon-reload || true
 
 echo "==== [4/7] Restaurando sysctl y limpiando iptables ===="
-sysctl -w net.ipv4.ip_forward=0 >/dev/null 2>&1 || true
-DEF_IF=$(ip route 2>/dev/null | awk '/^default/{print $5; exit}'); DEF_IF=${DEF_IF:-eth0}
-iptables -t nat -D POSTROUTING -o "$DEF_IF" -j MASQUERADE 2>/dev/null || true
-iptables -D FORWARD -i wg0 -j ACCEPT 2>/dev/null || true
-iptables -D FORWARD -o wg0 -j ACCEPT 2>/dev/null || true
-iptables -t mangle -D FORWARD -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu 2>/dev/null || true
-iptables -D INPUT -i wg0 -j ACCEPT 2>/dev/null || true
+sysctl -w net.ipv4.ip_forward=0 || true
+DEF_IF=$(ip route | awk '/^default/{print $5; exit}'); DEF_IF=${DEF_IF:-eth0}
+iptables -t nat -D POSTROUTING -o "$DEF_IF" -j MASQUERADE || true
+iptables -D FORWARD -i wg0 -j ACCEPT || true
+iptables -D FORWARD -o wg0 -j ACCEPT || true
+iptables -t mangle -D FORWARD -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu || true
+iptables -D INPUT -i wg0 -j ACCEPT || true
 
 echo "==== [5/7] Desinstalando paquetes instalados por la VPN ===="
-apt-get purge -y wireguard wireguard-tools openresolv dnsmasq qrencode dnsmasq-base dns-root-data libqrencode4 2>/dev/null || true
-apt-get autoremove -y 2>/dev/null || true
+apt-get purge -y wireguard wireguard-tools openresolv dnsmasq qrencode dnsmasq-base dns-root-data libqrencode4 || true
+apt-get autoremove -y || true
 
 echo "==== [6/7] VERIFICACION ===="
 echo "-- wg0 --";        ip link show wg0 2>&1 | head -1 || true
@@ -184,7 +184,7 @@ echo "-- ufw --";        ufw status verbose 2>&1 | head -10
 echo "-- /etc/wireguard --"; ls -d /etc/wireguard 2>&1 || echo "OK: no existe"
 echo "-- /opt/AdGuardHome --"; ls -d /opt/AdGuardHome 2>&1 || echo "OK: no existe"
 echo "-- sysctl --";     sysctl net.ipv4.ip_forward 2>&1
-echo "-- paquetes --";   dpkg -l 2>/dev/null | grep -iE "wireguard|adguard|dnsmasq" || echo "OK: sin paquetes VPN"
+echo "-- paquetes --";   dpkg -l | grep -iE "wireguard|adguard|dnsmasq" || echo "OK: sin paquetes VPN"
 echo "-- iptables nat --"; iptables -t nat -L POSTROUTING -n 2>&1 | head -4
 echo "-- iptables mangle --"; iptables -t mangle -L FORWARD -n 2>&1 | head -3
 
