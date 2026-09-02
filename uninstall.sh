@@ -114,8 +114,7 @@ uninstall_servidor() {
     [ -n "$SSHPASS_BIN" ] || warn "sshpass no disponible; se usara SSH interactivo."
   fi
 
-  SSH_BASE=(-o ConnectTimeout=20 -o StrictHostKeyChecking=accept-new \
-    -o ControlMaster=auto -o ControlPath="/tmp/ssh-uninstall-%r@%h:%p" -o ControlPersist=300)
+  SSH_BASE=(-o ConnectTimeout=20 -o StrictHostKeyChecking=accept-new)
   ssh_run() {
     if [ -n "$SSH_PASS" ] && [ -n "$SSHPASS_BIN" ]; then
       "$SSHPASS_BIN" -p "$SSH_PASS" ssh "${SSH_BASE[@]}" "${SSH_USER}@${VPS_IP}" "$@"
@@ -129,6 +128,11 @@ uninstall_servidor() {
   echo "=========================================================="
   echo "  Desinstalando VPN PERSONAL del servidor $VPS_IP"
   echo "=========================================================="
+  # Limpiar conexiones SSH multiplexadas previas (evita colgarse con sockets obsoletos)
+  pkill -f "ssh: /tmp/ssh-uninstall-" 2>/dev/null || true
+  pkill -f "ssh: /tmp/ssh-vpn-" 2>/dev/null || true
+  rm -f /tmp/ssh-uninstall-* /tmp/ssh-vpn-* 2>/dev/null || true
+
   info "Probando conexion SSH a ${SSH_USER}@${VPS_IP}..."
   REMOTE_UID=$(ssh_run 'id -u' | tr -d '\r')
   [ -n "$REMOTE_UID" ] || fail "No se pudo conectar por SSH."

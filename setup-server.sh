@@ -85,8 +85,7 @@ if [ -z "$SSH_PASS" ] && [ -z "$SSH_KEY" ]; then
   echo ""
 fi
 
-SSH_BASE=(-o ConnectTimeout=20 -o StrictHostKeyChecking=accept-new \
-  -o ControlMaster=auto -o ControlPath="/tmp/ssh-vpn-%r@%h:%p" -o ControlPersist=300)
+SSH_BASE=(-o ConnectTimeout=20 -o StrictHostKeyChecking=accept-new)
 ssh_run() {
   if [ -n "$SSH_PASS" ] && [ -n "$SSHPASS_BIN" ]; then
     "$SSHPASS_BIN" -p "$SSH_PASS" ssh "${SSH_BASE[@]}" "${SSH_USER}@${VPS_IP}" "$@"
@@ -144,6 +143,10 @@ if [ -n "$SSH_PASS" ] && [ -z "$SSHPASS_BIN" ]; then
 else
   ok "sshpass localizado: ${SSHPASS_BIN:-no necesario}"
 fi
+
+# Limpiar conexiones SSH multiplexadas previas (evita colgarse con sockets obsoletos)
+pkill -f "ssh: /tmp/ssh-vpn-" 2>/dev/null || true
+rm -f /tmp/ssh-vpn-* 2>/dev/null || true
 
 info "Probando conexion SSH a ${SSH_USER}@${VPS_IP}..."
 REMOTE_UID=$(ssh_run 'id -u' | tr -d '\r')
