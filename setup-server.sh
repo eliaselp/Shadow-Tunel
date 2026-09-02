@@ -308,9 +308,10 @@ if [ "__INSTALL_ADGUARD__" = "yes" ]; then
   AG_VER=$(curl --max-time 20 https://api.github.com/repos/AdguardTeam/AdGuardHome/releases/latest \
     | python3 -c "import json,sys;print(json.load(sys.stdin).get('tag_name','v0.107.0'))" || echo v0.107.0)
   AG_URL="https://github.com/AdguardTeam/AdGuardHome/releases/download/${AG_VER}/AdGuardHome_linux_amd64.tar.gz"
-  echo "Descargando AdGuardHome ${AG_VER} (con progreso, reanudable)..."
+  echo "Descargando AdGuardHome ${AG_VER} (con progreso)..."
   cd /tmp
-  if curl -fSL --retry 5 --retry-delay 2 --max-time 120 -C - -o ag.tar.gz "$AG_URL" && [ -s ag.tar.gz ]; then
+  rm -f ag.tar.gz  # evitar que un archivo parcial cause error 416 al reanudar
+  if curl -fSL --retry 5 --retry-delay 2 --max-time 120 -o ag.tar.gz "$AG_URL" && [ -s ag.tar.gz ]; then
     mkdir -p /opt/AdGuardHome
     if tar -xzf ag.tar.gz -C /opt; then
       chmod +x /opt/AdGuardHome/AdGuardHome

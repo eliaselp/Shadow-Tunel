@@ -75,6 +75,7 @@ ok "Dependencias listas"
 
 # ---------- 2) config CLI ----------
 info "Instalando config $DISPOSITIVO en /etc/wireguard/ (para wg-quick CLI)..."
+mkdir -p /etc/wireguard
 install -m 600 "$CONF" "/etc/wireguard/$DISPOSITIVO.conf"
 ok "Config copiada: /etc/wireguard/$DISPOSITIVO.conf"
 
