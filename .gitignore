@@ -1,0 +1,10 @@
+# Credenciales y secretos
+.env
+
+# Claves privadas de los clientes y sus QR (contienen secretos)
+clientes/*.conf
+clientes/*.png
+
+# Logs y temporales
+*.log
+/tmp/
