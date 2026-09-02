@@ -49,6 +49,55 @@ limpiar_existente() {
   fi
   ok "Limpieza de '$DISPOSITIVO' completada"
 }
+# Descarga validando tamano contra el servidor; si falta reanuda con wget -c
+# hasta completar; si esta corrupto (mas grande de lo esperado) lo elimina.
+descargar_verificado() {  # $1=URL, $2=destino
+  local url="$1" dest="$2" esperado=0 actual=0 intentos=0
+  info "Consultando el tamano real del archivo en el servidor..."
+  esperado=$(wget --spider --server-response -O /dev/null "$url" 2>&1 \
+    | awk 'tolower($0) ~ /^ *content-length:/{gsub("\r",""); val=$2} END{print val+0}')
+  if [ "$esperado" -gt 0 ]; then
+    ok "Tamano esperado segun el servidor: $esperado bytes"
+  else
+    warn "No se pudo determinar el tamano esperado; se descargara y validara de forma basica."
+  fi
+
+  if [ -f "$dest" ]; then
+    actual=$(stat -c %s "$dest" 2>/dev/null || echo 0)
+    if [ "$esperado" -gt 0 ] && [ "$actual" -gt "$esperado" ]; then
+      warn "Archivo existente MAS GRANDE que lo esperado ($actual > $esperado): corrupto. Se elimina."
+      rm -f "$dest"
+    elif [ "$esperado" -gt 0 ] && [ "$actual" -eq "$esperado" ]; then
+      ok "Archivo ya completo en disco: $actual bytes. Se usara."
+      return 0
+    elif [ "$esperado" -gt 0 ] && [ "$actual" -gt 0 ]; then
+      warn "Archivo incompleto en disco: $actual / $esperado bytes. Se continuara con wget -c."
+    fi
+  fi
+
+  while :; do
+    intentos=$((intentos+1))
+    info "Descarga (intento $intentos) con wget -c (reanudable)..."
+    wget -c --tries=3 --timeout=30 -O "$dest" "$url" || true
+    actual=$(stat -c %s "$dest" 2>/dev/null || echo 0)
+    info "Bytes en disco tras el intento: $actual"
+    if [ "$esperado" -gt 0 ]; then
+      if [ "$actual" -ge "$esperado" ]; then
+        ok "Descarga completada: $actual / $esperado bytes."
+        return 0
+      fi
+      warn "Aun incompleto: $actual / $esperado bytes. Reintentando (wget -c resume)..."
+    else
+      if [ -s "$dest" ]; then
+        ok "Descarga finalizada ($actual bytes, sin tamano de referencia)."
+        return 0
+      fi
+    fi
+    [ "$intentos" -ge 6 ] && break
+  done
+  return 1
+}
+
 instalar_amneziavpn() {
   info "AmneziaVPN (app dedicada con GUI, open source)..."
   local BIN=""
@@ -81,12 +130,10 @@ for a in d.get('assets',[]):
   [ -n "$URL" ] || fail "No se encontro instalador Linux para AmneziaVPN. Descargalo manualmente desde https://github.com/amnezia-vpn/amnezia-client/releases"
 
   ARCHIVO="/tmp/opencode/amneziavpn_${TAG}.run"
-  if [ ! -s "$ARCHIVO" ]; then
-    info "Descargando con wget -c (reanudable, con progreso):"
-    echo "    $URL"
-    wget -c --tries=3 --timeout=30 -O "$ARCHIVO" "$URL"
-  else
-    ok "Archivo ya descargado: $ARCHIVO"
+  echo "    $URL"
+  if ! descargar_verificado "$URL" "$ARCHIVO"; then
+    rm -f "$ARCHIVO"
+    fail "No se pudo descargar AmneziaVPN completo. Reintenta manualmente: wget -c -O $ARCHIVO $URL"
   fi
   chmod +x "$ARCHIVO"
 
@@ -94,11 +141,18 @@ for a in d.get('assets',[]):
   apt-get install -y libxcb-cursor0 libxcb-xinerama0 libxcb-icccm4 libxcb-keysyms1 libopengl0 libxkbcommon-x11-0 || true
 
   info "Ejecutando el instalador de AmneziaVPN (silencioso)..."
-  "$ARCHIVO" --accept-licenses yes --default-answer yes --confirm-command yes --root "$HOME/AmneziaVPN" \
-    || warn "La instalacion pudo requerir interaccion. Si no quedo instalado, ejecuta: $ARCHIVO"
+  RUN_USER="${SUDO_USER:-$(whoami)}"
+  if [ "$(id -u)" = "0" ] && [ "$RUN_USER" != "root" ]; then
+    sudo -u "$RUN_USER" env DISPLAY="${DISPLAY:-:0}" XDG_RUNTIME_DIR="/run/user/$(id -u "$RUN_USER")" \
+      "$ARCHIVO" --accept-licenses yes --default-answer yes --confirm-command yes --root "/home/$RUN_USER/AmneziaVPN" \
+      || warn "La instalacion pudo requerir interaccion. Si no quedo instalado, ejecuta: $ARCHIVO"
+  else
+    "$ARCHIVO" --accept-licenses yes --default-answer yes --confirm-command yes --root "$HOME/AmneziaVPN" \
+      || warn "La instalacion pudo requerir interaccion. Si no quedo instalado, ejecuta: $ARCHIVO"
+  fi
 
   BIN=""
-  for c in "$HOME/AmneziaVPN/AmneziaVPN" "$HOME/AmneziaVPN/amneziavpn"; do
+  for c in "$HOME/AmneziaVPN/AmneziaVPN" "$HOME/AmneziaVPN/amneziavpn" "/opt/AmneziaVPN/AmneziaVPN" "/home/${RUN_USER:-root}/AmneziaVPN/AmneziaVPN"; do
     [ -x "$c" ] && BIN="$c" && break
   done
   if [ -n "$BIN" ]; then
