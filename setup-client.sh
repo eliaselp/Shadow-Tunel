@@ -49,65 +49,6 @@ limpiar_existente() {
   fi
   ok "Limpieza de '$DISPOSITIVO' completada"
 }
-
-echo "=========================================================="
-echo "  VPN PERSONAL - Setup de Cliente Linux (Zorin/Ubuntu)"
-echo "  Dispositivo: $DISPOSITIVO | Servidor: $VPS_IP (Dallas)"
-echo "=========================================================="
-
-[ "$(id -u)" = "0" ] || fail "Ejecuta con sudo:  sudo bash setup-client.sh $DISPOSITIVO"
-[ -f "$CONF" ] || fail "No existe $CONF. Generalo con setup-server.sh o copialo a clientes/."
-
-limpiar_existente
-
-if ! grep -q '^MTU' "$CONF"; then
-  warn "Agregando MTU = 1280 (necesario en redes celulares/hotspot)..."
-  sed -i '0,/^\[Interface\]/a MTU = 1280' "$CONF"
-fi
-
-# ---------- 1) dependencias (output completo, nada oculto) ----------
-info "Verificando/instalando dependencias (wireguard-tools, openresolv, qrencode, curl, wget, dnsutils)..."
-apt-get update
-apt-get install -y wireguard-tools openresolv qrencode curl wget dnsutils || \
-  apt-get install -y wireguard-tools openresolv qrencode curl wget bind9-dnsutils || \
-  apt-get install -y wireguard-tools openresolv qrencode curl wget
-ok "Dependencias listas"
-
-# ---------- 2) config CLI ----------
-info "Instalando config $DISPOSITIVO en /etc/wireguard/ (para wg-quick CLI)..."
-mkdir -p /etc/wireguard
-install -m 600 "$CONF" "/etc/wireguard/$DISPOSITIVO.conf"
-ok "Config copiada: /etc/wireguard/$DISPOSITIVO.conf"
-
-# ---------- 3) interfaz grafica NetworkManager (estilo ProtonVPN) ----------
-info "Configurando interfaz grafica (NetworkManager / applet del panel)..."
-nmcli connection import type wireguard file "$CONF"
-nmcli connection modify "$DISPOSITIVO" \
-  connection.autoconnect no \
-  ipv4.dns 10.66.66.1 \
-  ipv4.dns-search "~" \
-  ipv4.dns-priority -1500 \
-  ipv4.ignore-auto-dns yes \
-  ipv6.method disabled \
-  wireguard.mtu 1280
-ok "Conexion '$DISPOSITIVO' configurada (MTU 1280, DNS prioritario, sin IPv6)"
-
-info "Activando VPN ahora..."
-nmcli connection up "$DISPOSITIVO"
-ok "VPN activa. La veras en: Icono de red -> VPN -> $DISPOSITIVO"
-
-# ---------- 4) AmneziaVPN opcional (wget -c, progreso visible) ----------
-read -rp "¿Instalar AmneziaVPN (app visual con boton Conectar)? [s/N]: " ans
-if [[ "$ans" =~ ^[sSyY]$ ]]; then
-  instalar_amneziavpn
-else
-  info "Omitiendo AmneziaVPN. Puedes conectarte desde el icono de red -> VPN -> $DISPOSITIVO"
-fi
-
-# ---------- 5) verificacion completa ----------
-verificar_conexion
-
-# ================================================================
 instalar_amneziavpn() {
   info "AmneziaVPN (app dedicada con GUI, open source)..."
   local BIN=""
@@ -206,3 +147,60 @@ verificar_conexion() {
     warn "La IP publica no coincide con el VPS. Revisa el estado de la conexion."
   fi
 }
+echo "=========================================================="
+echo "  VPN PERSONAL - Setup de Cliente Linux (Zorin/Ubuntu)"
+echo "  Dispositivo: $DISPOSITIVO | Servidor: $VPS_IP (Dallas)"
+echo "=========================================================="
+
+[ "$(id -u)" = "0" ] || fail "Ejecuta con sudo:  sudo bash setup-client.sh $DISPOSITIVO"
+[ -f "$CONF" ] || fail "No existe $CONF. Generalo con setup-server.sh o copialo a clientes/."
+
+limpiar_existente
+
+if ! grep -q '^MTU' "$CONF"; then
+  warn "Agregando MTU = 1280 (necesario en redes celulares/hotspot)..."
+  sed -i '0,/^\[Interface\]/a MTU = 1280' "$CONF"
+fi
+
+# ---------- 1) dependencias (output completo, nada oculto) ----------
+info "Verificando/instalando dependencias (wireguard-tools, openresolv, qrencode, curl, wget, dnsutils)..."
+apt-get update
+apt-get install -y wireguard-tools openresolv qrencode curl wget dnsutils || \
+  apt-get install -y wireguard-tools openresolv qrencode curl wget bind9-dnsutils || \
+  apt-get install -y wireguard-tools openresolv qrencode curl wget
+ok "Dependencias listas"
+
+# ---------- 2) config CLI ----------
+info "Instalando config $DISPOSITIVO en /etc/wireguard/ (para wg-quick CLI)..."
+mkdir -p /etc/wireguard
+install -m 600 "$CONF" "/etc/wireguard/$DISPOSITIVO.conf"
+ok "Config copiada: /etc/wireguard/$DISPOSITIVO.conf"
+
+# ---------- 3) interfaz grafica NetworkManager (estilo ProtonVPN) ----------
+info "Configurando interfaz grafica (NetworkManager / applet del panel)..."
+nmcli connection import type wireguard file "$CONF"
+nmcli connection modify "$DISPOSITIVO" \
+  connection.autoconnect no \
+  ipv4.dns 10.66.66.1 \
+  ipv4.dns-search "~" \
+  ipv4.dns-priority -1500 \
+  ipv4.ignore-auto-dns yes \
+  ipv6.method disabled \
+  wireguard.mtu 1280
+ok "Conexion '$DISPOSITIVO' configurada (MTU 1280, DNS prioritario, sin IPv6)"
+
+info "Activando VPN ahora..."
+nmcli connection up "$DISPOSITIVO"
+ok "VPN activa. La veras en: Icono de red -> VPN -> $DISPOSITIVO"
+
+# ---------- 4) AmneziaVPN opcional (wget -c, progreso visible) ----------
+read -rp "¿Instalar AmneziaVPN (app visual con boton Conectar)? [s/N]: " ans
+if [[ "$ans" =~ ^[sSyY]$ ]]; then
+  instalar_amneziavpn
+else
+  info "Omitiendo AmneziaVPN. Puedes conectarte desde el icono de red -> VPN -> $DISPOSITIVO"
+fi
+
+# ---------- 5) verificacion completa ----------
+verificar_conexion
+

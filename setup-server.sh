@@ -316,7 +316,17 @@ if [ "__INSTALL_ADGUARD__" = "yes" ]; then
     if tar -xzf ag.tar.gz -C /opt; then
       chmod +x /opt/AdGuardHome/AdGuardHome
       ADM_PASS="Adm$(openssl rand -hex 6)"
-      HASH=$(/opt/AdGuardHome/AdGuardHome --hash-password "$ADM_PASS" | tr -d '\r' | tail -n1)
+      # Generar hash bcrypt para el panel (AdGuard >= v0.107 no acepta --hash-password)
+      HASH=""
+      if ! command -v htpasswd >/dev/null 2>&1; then
+        echo "Instalando apache2-utils (para generar el hash bcrypt del panel)..."
+        apt-get install -y apache2-utils || true
+      fi
+      if command -v htpasswd >/dev/null 2>&1; then
+        HASH=$(htpasswd -bnBC 10 "" "$ADM_PASS" | tr -d ':\n')
+      else
+        HASH=$(/opt/AdGuardHome/AdGuardHome --hash-password "$ADM_PASS" | tr -d '\r' | tail -n1)
+      fi
       if [ -n "$HASH" ]; then
         cat > /opt/AdGuardHome/AdGuardHome.yaml <<AGEOF
 schema_version: 34
