@@ -1,6 +1,7 @@
 # Credenciales y secretos
 .env
 .env.*
+!.env.template
 
 # Claves privadas de los clientes y sus QR (contienen secretos)
 clientes/*.conf
