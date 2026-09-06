@@ -258,15 +258,31 @@ cat > "$REMOTE" <<'REMOTETPL'
 set -e
 export DEBIAN_FRONTEND=noninteractive
 
-echo "==== [1/6] Instalando dependencias del sistema ===="
-apt-get update
-apt-get install -y wireguard wireguard-tools qrencode openresolv ufw curl openssl python3
+echo "==== [1/7] Sincronizando reloj del servidor ===="
+# apt falla con "Release file is not valid yet" si el reloj del VPS esta desviado.
+CLIENT_EPOCH='__CLIENT_EPOCH__'
+SRV_EPOCH=$(date +%s)
+DIFF=$(( CLIENT_EPOCH - SRV_EPOCH ))
+DIFF_ABS=${DIFF#-}
+if [ "$DIFF_ABS" -gt 300 ]; then
+  echo "Reloj del VPS desviado ${DIFF}s respecto a tu equipo; corrigiendo..."
+  date -s "@${CLIENT_EPOCH}" || true
+  hwclock -w 2>/dev/null || true
+fi
+timedatectl set-ntp true 2>/dev/null || true
+date
 
-echo "==== [2/6] Habilitando forwarding IPv4 ===="
+echo "==== [2/7] Instalando dependencias del sistema ===="
+apt-get update
+apt-get install -y wireguard wireguard-tools qrencode ufw curl openssl python3
+# openresolv no existe en todas las versiones de Ubuntu; es opcional en el servidor
+apt-get install -y openresolv || echo "[AVISO] openresolv no disponible; se continua (opcional en el servidor)."
+
+echo "==== [3/7] Habilitando forwarding IPv4 ===="
 echo 'net.ipv4.ip_forward=1' > /etc/sysctl.d/99-wireguard.conf
 sysctl -p /etc/sysctl.d/99-wireguard.conf
 
-echo "==== [3/6] Configurando firewall (NO INVASIVO) ===="
+echo "==== [4/7] Configurando firewall (NO INVASIVO) ===="
 # NO se enciende ufw ni se cambia su politica. Si ufw ya estaba activo se
 # anaden SOLO las reglas minimas de la VPN. Si no, las reglas se aplican
 # via iptables scoped a wg0 (PostUp) sin afectar a otros servicios.
@@ -280,7 +296,7 @@ else
   echo "Las reglas de la VPN se aplican via iptables en PostUp de wg0."
 fi
 
-echo "==== [4/6] Escribiendo /etc/wireguard/wg0.conf ===="
+echo "==== [5/7] Escribiendo /etc/wireguard/wg0.conf ===="
 DEF_IF=$(ip route | awk '/^default/{print $5; exit}')
 DEF_IF=${DEF_IF:-eth0}
 echo "Interfaz de salida detectada: $DEF_IF"
@@ -319,13 +335,13 @@ AllowedIPs = 10.66.66.4/32
 WGEOF
 echo "[ OK ] wg0.conf escrito"
 
-echo "==== [5/6] Arrancando WireGuard (primero, para que exista 10.66.66.1) ===="
+echo "==== [6/7] Arrancando WireGuard (primero, para que exista 10.66.66.1) ===="
 systemctl enable wg-quick@wg0 || true
 systemctl restart wg-quick@wg0
 sleep 3
 wg show wg0 || true
 
-echo "==== [6/6] DNS del tunel ===="
+echo "==== [7/7] DNS del tunel ===="
 install_dnsmasq() {
   echo "Instalando dnsmasq (DNS simple del tunel)..."
   apt-get install -y dnsmasq || { echo "[AVISO] fallo al instalar dnsmasq"; return 0; }
@@ -462,6 +478,7 @@ sed -i "s|__MOVIL_PSK__|${DEV_PSK[movil]}|g"     "$REMOTE"
 sed -i "s|__PC_PUB__|${DEV_PUB[pc]}|g"           "$REMOTE"
 sed -i "s|__PC_PSK__|${DEV_PSK[pc]}|g"           "$REMOTE"
 sed -i "s|__INSTALL_ADGUARD__|${INSTALL_ADGUARD}|g" "$REMOTE"
+sed -i "s|__CLIENT_EPOCH__|$(date +%s)|g"            "$REMOTE"
 
 info "Desplegando en el VPS (instalacion de paquetes puede tardar unos minutos)..."
 ssh_run $RUN_AS_SUDO bash -s < "$REMOTE" | tee "$OUTPUT"

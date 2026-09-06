@@ -2,6 +2,8 @@
 .env
 .env.*
 !.env.template
+*.key
+*vpskey*
 
 # Claves privadas de los clientes y sus QR (contienen secretos)
 clientes/*.conf

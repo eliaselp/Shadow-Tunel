@@ -219,9 +219,11 @@ fi
 # ---------- 1) dependencias (output completo, nada oculto) ----------
 info "Verificando/instalando dependencias (wireguard-tools, openresolv, qrencode, curl, wget, dnsutils)..."
 apt-get update
-apt-get install -y wireguard-tools openresolv qrencode curl wget dnsutils || \
-  apt-get install -y wireguard-tools openresolv qrencode curl wget bind9-dnsutils || \
-  apt-get install -y wireguard-tools openresolv qrencode curl wget
+apt-get install -y wireguard-tools qrencode curl wget dnsutils || \
+  apt-get install -y wireguard-tools qrencode curl wget bind9-dnsutils || \
+  apt-get install -y wireguard-tools qrencode curl wget
+# openresolv es opcional (no existe en todas las versiones de Ubuntu)
+apt-get install -y openresolv || true
 ok "Dependencias listas"
 
 # ---------- 2) config CLI ----------
