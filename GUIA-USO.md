@@ -16,9 +16,14 @@
 user=root
 ip-server=TU_IP_DEL_VPS
 password=TU_CONTRASENA
+ssh-key=RUTA_DE_LA_CLAVE    # opcional: alternativa a password (clave SSH)
 ```
 
 > Alternativa sin `.env`: variables `VPS_IP=... SSH_USER=... SSH_KEY=... SSH_PASS=...`
+>
+> **Autenticación por argumentos** (sobreescribe `.env`):
+> `bash setup-server.sh -i ~/.ssh/id_ed25519 root@TU_IP_DEL_VPS`
+> — `-i RUTA_CLAVE` equivale a `ssh -i` (ruta de la clave privada) y `usuario@ip_o_dominio` fija el destino.
 
 ---
 
@@ -27,10 +32,12 @@ password=TU_CONTRASENA
 ```bash
 cd Proyectos/VPN-Personal
 bash setup-server.sh
+# o con clave SSH por argumentos (equivale a `ssh -i`):
+bash setup-server.sh -i ~/.ssh/id_ed25519 root@TU_IP_DEL_VPS
 ```
 
 El script:
-1. Lee `.env` y conecta por **SSH** con esas credenciales (`sshpass`)
+1. Lee `.env` (o los argumentos `-i` / `usuario@host`) y conecta por **SSH** (clave o `sshpass`)
 2. Instala en el VPS: **WireGuard**, forwarding IPv4
 3. **Genera TODAS las claves**: servidor + cada dispositivo (laptop, movil, pc) con su preshared key
 4. Configura **NAT + TCPMSS + DNS del túnel** (AdGuard Home o dnsmasq) de forma **NO invasiva**: no enciende ufw si estaba apagado, no toca otros servicios ni usuarios
@@ -155,7 +162,7 @@ Ahí ves: estadísticas, query log, filtros (AdGuard DNS / Tracking / Mobile Ads
 | Contraseña panel AdGuard | `cat /etc/wireguard/.adguard_admin_pw` |
 | Actualizaciones | automáticas (unattended-upgrades) |
 
-**Acceso SSH:** `root` (con la contraseña configurada en `.env`).
+**Acceso SSH:** `root` (con la contraseña del `.env` o la clave `ssh-key`/`-i`).
 
 ---
 
@@ -192,4 +199,4 @@ Elimina **solo lo que se tocó** (WireGuard, AdGuard/dnsmasq, reglas ufw, sysctl
 - Clave privada del servidor **nunca** sale del VPS.
 - Rotación recomendada cada 6–12 meses: regenera con `setup-server.sh` eligiendo **no reutilizar** y vuelve a configurar cada dispositivo.
 - `fail2ban` protege SSH (banea IPs de fuerza bruta automáticamente).
-- Usa contraseñas fuertes en el VPS y en el `.env` (no lo subas a GitHub).
+- Usa contraseñas fuertes en el VPS y en el `.env` (ni el `.env` ni variantes como `.env.elias` deben subirse a GitHub).

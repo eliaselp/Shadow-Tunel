@@ -67,9 +67,11 @@ password=TU_CONTRASENA
 
 ```bash
 bash setup-server.sh
+# o con autenticación por clave SSH (equivale a `ssh -i`):
+bash setup-server.sh -i ~/.ssh/id_ed25519 root@TU_IP_DEL_VPS
 ```
 
-Genera **todas las claves** (servidor + laptop/movil/pc), configura NAT, firewall y DNS, y deja las configs listas en `clientes/`.
+Genera **todas las claves** (servidor + laptop/movil/pc), configura NAT, firewall y DNS, y deja las configs listas en `clientes/`. La autenticación puede venir del `.env` (opción `ssh-key=RUTA` o `password`) o por argumentos: `-i RUTA_CLAVE` + `usuario@ip_o_dominio`.
 
 ### 3. Configura el cliente
 
@@ -97,7 +99,7 @@ clientes/laptop.png · clientes/movil.png · clientes/pc.png
 
 | Script | Uso | Qué hace |
 |---|---|---|
-| `setup-server.sh` | `bash setup-server.sh` | Despliega el servidor completo (WireGuard + claves + NAT + DNS AdGuard) usando credenciales de `.env` |
+| `setup-server.sh` | `bash setup-server.sh` (o `bash setup-server.sh -i RUTA_CLAVE usuario@ip`) | Despliega el servidor completo (WireGuard + claves + NAT + DNS AdGuard) usando credenciales de `.env` o por argumentos |
 | `setup-client.sh` | `sudo bash setup-client.sh laptop` | Configura el cliente listo para usar (GUI + CLI + verificación) |
 | `uninstall.sh` | `sudo bash uninstall.sh --server\|--client\|--all` | Elimina solo lo que se tocó, sin afectar otros servicios |
 
@@ -108,7 +110,7 @@ clientes/laptop.png · clientes/movil.png · clientes/pc.png
 - Claves privadas de clientes solo en tus dispositivos (permisos `600`); la del servidor nunca sale del VPS.
 - Autenticación por **clave pública/privada** (WireGuard) — puedes conectarte desde cualquier IP.
 - `fail2ban` protege SSH contra fuerza bruta.
-- El `.env` con la contraseña **no debe subirse a GitHub** (usa `.env.example` como plantilla).
+- El `.env` y cualquier variante (`.env.elias`, etc.) con credenciales **no deben subirse a GitHub** (usa `.env.example` como plantilla).
 
 ---
 
