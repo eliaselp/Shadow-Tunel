@@ -13,10 +13,17 @@
 #      user=root
 #      ip-server=TU_IP_DEL_VPS
 #      password=TU_CONTRASENA
+#      ssh-key=RUTA_DE_LA_CLAVE    (opcional, alternativa a password)
 #    (o variables de entorno VPS_IP / SSH_USER / SSH_PASS / SSH_KEY)
 #    Si no hay .env, pregunta de forma interactiva.
 #
-#  USO:  bash setup-server.sh
+#  AUTENTICACION POR ARGUMENTOS (alternativa al .env):
+#      -i RUTA_CLAVE   equivale a "ssh -i" (ruta de la clave privada)
+#      usuario@ip_o_dominio   destino SSH (sobreescribe .env)
+#
+#  USO:
+#    bash setup-server.sh
+#    bash setup-server.sh -i ~/.ssh/id_ed25519 root@1.2.3.4
 #  Requisitos: ssh, sshpass (si usas contrasena), wireguard-tools
 #              (wg), qrencode, curl
 # ================================================================
@@ -46,10 +53,42 @@ echo "=========================================================="
 echo "  VPN PERSONAL - SETUP SERVIDOR (WireGuard + DNS)"
 echo "=========================================================="
 
+# ---------- argumentos ----------
+# Autenticacion alternativa por argumentos:
+#   bash setup-server.sh -i ~/.ssh/id_ed25519 root@1.2.3.4
+SSH_KEY_ARG=""
+SSH_USER_ARG=""
+VPS_IP_ARG=""
+usage() {
+  echo "Uso: bash $(basename "$0") [-i RUTA_CLAVE] [usuario@ip_o_dominio]"
+  echo "  -i RUTA_CLAVE   Ruta de la clave SSH privada (equivale a: ssh -i)"
+  echo "  usuario@host    Usuario y servidor destino (sobreescribe .env)"
+}
+while getopts "i:h" opt; do
+  case "$opt" in
+    i) SSH_KEY_ARG="$OPTARG" ;;
+    h) usage; exit 0 ;;
+    *) usage; exit 2 ;;
+  esac
+done
+shift $((OPTIND-1))
+if [ $# -gt 0 ]; then
+  case "$1" in
+    *@*)
+      SSH_USER_ARG="${1%%@*}"
+      VPS_IP_ARG="${1#*@}"
+      ;;
+    *)
+      VPS_IP_ARG="$1"
+      ;;
+  esac
+fi
+
 # ---------- credenciales del VPS ----------
-VPS_IP="${VPS_IP:-}"
-SSH_USER="${SSH_USER:-}"
-SSH_KEY="${SSH_KEY:-}"
+# Prioridad: argumentos > variables de entorno > .env > prompts interactivos
+VPS_IP="${VPS_IP_ARG:-${VPS_IP:-}}"
+SSH_USER="${SSH_USER_ARG:-${SSH_USER:-}}"
+SSH_KEY="${SSH_KEY_ARG:-${SSH_KEY:-}}"
 SSH_PASS="${SSH_PASS:-}"
 
 # Cargar credenciales desde .env si existe
@@ -69,7 +108,7 @@ if [ -f "$ENV_FILE" ]; then
   done < "$ENV_FILE"
   ok "Credenciales cargadas desde .env (user=$SSH_USER, ip-server=$VPS_IP)"
 else
-  warn "No existe $ENV_FILE; se usaran prompts interactivos. Crea un .env con: user=..., ip-server=..., password=..."
+  warn "No existe $ENV_FILE; se usaran prompts interactivos. Crea un .env con: user=..., ip-server=..., password=... o pasa la autenticacion por argumentos: bash setup-server.sh -i RUTA_CLAVE usuario@ip_o_dominio"
 fi
 
 # Completar lo que falte de forma interactiva
