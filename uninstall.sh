@@ -69,7 +69,7 @@ uninstall_cliente() {
   done
 
   info "Eliminando logs locales de diagnostico/reparacion..."
-  rm -f /home/*/Desktop/dev-agent/Proyectos/VPN-Personal/reparar-vpn.log || true
+  rm -f "$PROYECTO/reparar-vpn.log" || true
 
   ok "CLIENTE LIMPIO."
 }
@@ -139,7 +139,11 @@ uninstall_servidor() {
   RUN_AS_SUDO=""
   [ "$REMOTE_UID" != "0" ] && RUN_AS_SUDO="sudo"
 
-  REMOTE="/tmp/opencode/uninstall-server-$$.sh"
+  # Temporales DENTRO del proyecto (portable: no depende de rutas de otra maquina)
+  TMP_DIR="$PROYECTO/.tmp"
+  mkdir -p "$TMP_DIR"
+  trap 'rm -rf "$TMP_DIR"' EXIT
+  REMOTE="$TMP_DIR/uninstall-server-$$.sh"
   cat > "$REMOTE" <<'REMOTETPL'
 #!/bin/bash
 set -e

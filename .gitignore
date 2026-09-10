@@ -12,3 +12,4 @@ clientes/*.png
 # Logs y temporales
 *.log
 /tmp/
+.tmp/

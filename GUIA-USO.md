@@ -30,7 +30,7 @@ ssh-key=RUTA_DE_LA_CLAVE    # opcional: alternativa a password (clave SSH)
 ## 1. Desplegar el servidor (una vez por VPS)
 
 ```bash
-cd Proyectos/VPN-Personal
+cd vpn-personal    # nombre de la carpeta del repositorio (ajusta si la renombraste)
 bash setup-server.sh
 # o con clave SSH por argumentos (equivale a `ssh -i`):
 bash setup-server.sh -i ~/.ssh/id_ed25519 root@TU_IP_DEL_VPS

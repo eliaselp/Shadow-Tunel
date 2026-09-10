@@ -30,6 +30,10 @@ ok()   { echo -e "\033[1;32m[ OK ]\033[0m $*"; }
 warn() { echo -e "\033[1;33m[AVISO]\033[0m $*"; }
 fail() { echo -e "\033[1;31m[ERROR]\033[0m $*"; exit 1; }
 
+# Carpeta de temporales del proyecto (portable y autocontenida; se limpia al salir)
+TMP_DIR="$PROYECTO/.tmp"
+trap 'rm -rf "$TMP_DIR"' EXIT
+
 # ---------- limpiar configuracion previa de este dispositivo ----------
 limpiar_existente() {
   info "Limpiando configuracion previa de '$DISPOSITIVO' (si existe)..."
@@ -129,7 +133,8 @@ for a in d.get('assets',[]):
   fi
   [ -n "$URL" ] || fail "No se encontro instalador Linux para AmneziaVPN. Descargalo manualmente desde https://github.com/amnezia-vpn/amnezia-client/releases"
 
-  ARCHIVO="/tmp/opencode/amneziavpn_${TAG}.run"
+  mkdir -p "$TMP_DIR"
+  ARCHIVO="$TMP_DIR/amneziavpn_${TAG}.run"
   echo "    $URL"
   if ! descargar_verificado "$URL" "$ARCHIVO"; then
     rm -f "$ARCHIVO"

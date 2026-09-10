@@ -251,8 +251,12 @@ INSTALL_ADGUARD="yes"
 [[ "$ans" =~ ^[nN]$ ]] && INSTALL_ADGUARD="no"
 
 # ---------- script remoto ----------
-OUTPUT="/tmp/opencode/setup-server-output-$$.log"
-REMOTE="/tmp/opencode/setup-server-remote-$$.sh"
+# Temporales DENTRO del proyecto (portable: no depende de rutas de otra maquina)
+TMP_DIR="$PROYECTO/.tmp"
+mkdir -p "$TMP_DIR"
+trap 'rm -rf "$TMP_DIR"' EXIT
+OUTPUT="$TMP_DIR/setup-server-output-$$.log"
+REMOTE="$TMP_DIR/setup-server-remote-$$.sh"
 cat > "$REMOTE" <<'REMOTETPL'
 #!/bin/bash
 set -e
@@ -482,7 +486,7 @@ sed -i "s|__CLIENT_EPOCH__|$(date +%s)|g"            "$REMOTE"
 
 info "Desplegando en el VPS (instalacion de paquetes puede tardar unos minutos)..."
 ssh_run $RUN_AS_SUDO bash -s < "$REMOTE" | tee "$OUTPUT"
-rm -f "$REMOTE"
+rm -f "$REMOTE" "$OUTPUT"
 
 # ---------- capturar resultados ----------
 ADGUARD_OK=$(grep -oP 'ADGUARD_OK=\K[01]' "$OUTPUT" | tail -1 || echo 0)
